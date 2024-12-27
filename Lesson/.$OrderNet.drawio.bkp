@@ -1,0 +1,46 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.5 Chrome/126.0.6478.183 Electron/31.3.0 Safari/537.36" version="24.7.5">
+  <diagram name="ページ1" id="ln5z6j8cxkB7ya5_pSJh">
+    <mxGraphModel dx="712" dy="829" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="2000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="xpMtv3fqlLtutdRSdk_--1" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;DQNFX&lt;/h1&gt;&lt;div&gt;OrderNetは予測ではなく、売買を直接ネットワークに組み込んで行う形のネットワーク&lt;/div&gt;&lt;div&gt;やりたいこととしては1週間のデータ内で売買を繰り返して最も利益の大きいネットワークとそのパラメーターを見つけ出すことが目的。&lt;/div&gt;&lt;div&gt;一週間が終わった際に保持しているポジションは強制的に決済され結果に反映される&lt;/div&gt;&lt;div&gt;これに良い機械学習の方法としてDeep Q Learningがある。深層強化学習と翻訳されるこれはゲームを行って最も最もスコアの高い動作を学習していくものである。&lt;/div&gt;&lt;div&gt;これを使うと売買確定をゲームとして捉えて、この中で最もスコアの高いものを採用するという形になる。&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;この際にデータの偏りをなくすために１週間の値を二次関数で近似し、これを例えば100の配列パラメーターに配置。データ全体でこれを足していって勾配が緩やかになるようにデータを選ぶということが必要。&lt;/div&gt;&lt;div&gt;そうすることで売り優勢買い優勢のどちらの環境でも同様な確率で勝利することが出来るネットワークとなる&lt;/div&gt;" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="470" y="210" width="510" height="290" as="geometry" />
+        </mxCell>
+        <mxCell id="xpMtv3fqlLtutdRSdk_--3" value="まず単純化するためにポジションを保持している間は新たなポジションを持たないとする" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="470" y="520" width="500" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="xpMtv3fqlLtutdRSdk_--5" value="S (現在取得できるデータ)" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="610" width="480" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="xpMtv3fqlLtutdRSdk_--6" value="現在のTickValue" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" vertex="1" parent="xpMtv3fqlLtutdRSdk_--5">
+          <mxGeometry y="30" width="480" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="xpMtv3fqlLtutdRSdk_--7" value="ポジションがある場合はポジションの利益または損失" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" vertex="1" parent="xpMtv3fqlLtutdRSdk_--5">
+          <mxGeometry y="60" width="480" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="xpMtv3fqlLtutdRSdk_--8" value="Elapsed_time&amp;nbsp; 2次元データ" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" vertex="1" parent="xpMtv3fqlLtutdRSdk_--5">
+          <mxGeometry y="90" width="480" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="xpMtv3fqlLtutdRSdk_--9" value="WeekDay" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" vertex="1" parent="xpMtv3fqlLtutdRSdk_--5">
+          <mxGeometry y="120" width="480" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="xpMtv3fqlLtutdRSdk_--10" value="Volume" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" vertex="1" parent="xpMtv3fqlLtutdRSdk_--5">
+          <mxGeometry y="150" width="480" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="xpMtv3fqlLtutdRSdk_--11" value="bollinger" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" vertex="1" parent="xpMtv3fqlLtutdRSdk_--5">
+          <mxGeometry y="180" width="480" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="xpMtv3fqlLtutdRSdk_--12" value="rsi" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" vertex="1" parent="xpMtv3fqlLtutdRSdk_--5">
+          <mxGeometry y="210" width="480" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="xpMtv3fqlLtutdRSdk_--13" value="macd" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" vertex="1" parent="xpMtv3fqlLtutdRSdk_--5">
+          <mxGeometry y="240" width="480" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="xpMtv3fqlLtutdRSdk_--14" value="stochastic" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;whiteSpace=wrap;html=1;" vertex="1" parent="xpMtv3fqlLtutdRSdk_--5">
+          <mxGeometry y="270" width="480" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
