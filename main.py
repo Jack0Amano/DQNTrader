@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import time
 from model import DQNAgent
+import torch
 
 def interpolate(df: pd.DataFrame, start_index, end_index, crop=True) -> pd.DataFrame:
 
@@ -186,8 +187,9 @@ class Trader:
                 profit = self.current_order.checkout(time, value, spread)
                 print("Checkout order is taken at", time, "Value is", value, "Profit is", profit)
                 self.orders.append(self.current_order)
+                pip = self.current_order.pip
                 self.current_order = None
-                return profit, profit
+                return profit / pip * 100, profit
             elif order_type == OrderType.BUY or order_type == OrderType.SELL:
                 # ポジションは１つしか許容しないため、報酬を下げる
                 return -100, 0
@@ -265,13 +267,13 @@ class Trader:
             volumes = np.array(sequence_data['Volume'].values[-sequence_length:])
             output.append(volumes)
 
-        return np.array([times, closes, profits, order_type])
+        return np.array(output)
     
     def get_state_channel_size(self):
         """
         get_stateが返すのチャンネル数を取得する  
         """
-        return self.state_channels.count(True)
+        return np.array(list(self.state_channels.values())).sum()
 
 class TraderDrawer:
     def __init__(self):
@@ -312,7 +314,7 @@ class TraderDrawer:
         plt.savefig(path)
 
 if __name__ == "__main__":
-
+    torch.autograd.set_detect_anomaly(True)
     path = "D:/TestAdvisor/Analyzers/Data/RawData/USDJPY/2015.01.02_2015.12.30.json"
     df = pd.read_json(path)
     df.columns = map(str.capitalize, df.columns)
@@ -332,7 +334,7 @@ if __name__ == "__main__":
     # またmodelにdropoutなどを採用して過学習を防ぐ
     # DRQNに変更して過去の状態を考慮する
     # もしくはR2D2を採用
-    
+
     # double dqnはTargetとQnetを使い分ける奴なのでこの初期コードですでに実現されている
     
     # データを切り取る長さ 解析の際に戦闘のパディングが必要なためinput_sequence_lengthより長い必要がある
@@ -342,6 +344,7 @@ if __name__ == "__main__":
 
     trader = Trader()
     state_channels = trader.get_state_channel_size()
+    print("State Channel Size is", state_channels)
     draw_trader = TraderDrawer()
 
     agent_model = DQNAgent(sequence_length=input_sequence_length, state_channel_size=state_channels)
@@ -352,13 +355,13 @@ if __name__ == "__main__":
 
     profit_histries = np.array([[interpolated_data.index[sequence_length], 0]])
 
-    limit_time = 60 * 12
+    limit_time = 60 * 24 * 7
 
     for i in range(0, len(interpolated_data) - sequence_length, 1):
         sequence = interpolated_data[i:i+sequence_length]
 
         if (i > limit_time):
-            draw_trader.save_graph("models/" + datetime.datetime.now().strftime("%Y%m%d%H%M%S") + ".png")
+            draw_trader.save_graph("models/withFullStateLSTM.png")
             break
 
         now = sequence.index[-1]
@@ -372,6 +375,7 @@ if __name__ == "__main__":
 
         order_raw_value = agent_model.action(state)
         order_type = OrderType(order_raw_value)
+        
 
         reward, profit = trader.take_action(close, spread, now, order_type)
         next_state = trader.get_state(sequence, input_sequence_length)
