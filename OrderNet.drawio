@@ -1,6 +1,6 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.5 Chrome/126.0.6478.183 Electron/31.3.0 Safari/537.36" version="24.7.5">
   <diagram name="ページ1" id="ln5z6j8cxkB7ya5_pSJh">
-    <mxGraphModel dx="1434" dy="837" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="2000" math="0" shadow="0">
+    <mxGraphModel dx="1687" dy="985" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="2000" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -97,8 +97,14 @@
         <mxCell id="uDSMtgbRLTREM34ysSIJ-3" value="まず作成するものとしてDebugのTickから Timeframeを作成していき&lt;div&gt;順にコンソールに表示していく機能&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
           <mxGeometry x="80" y="1750" width="390" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="M1YTZlziO0oyNBgJ5hX8-1" value="Playerの売買を表示していく機能&lt;div&gt;Position . Buy or .Sell&lt;/div&gt;&lt;div&gt;操作は 0(何もしない) 1(.Sell) 2(Buy)&amp;nbsp; CheckOut(3)&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+        <mxCell id="M1YTZlziO0oyNBgJ5hX8-1" value="Playerの売買を表示していく機能&lt;div&gt;Position . Buy or .Sell&lt;/div&gt;&lt;div&gt;操作は 0(何もしない) 1(.Sell) 2(Buy)&amp;nbsp; CheckOut(3)&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
           <mxGeometry x="130" y="1795" width="290" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="p07t9gtZVLEhhTWpKcEa-1" value="DDQNではない長期的な視点を持った深層強化学習&lt;div&gt;DDQNではないということはtargetネットワークが無い&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="310" y="1923" width="320" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="p07t9gtZVLEhhTWpKcEa-2" value="結局のところModelに直接値をぶち込むのではなく&lt;div&gt;ある程度のアルゴリズムを用意しておいて、これのパラメーターを機械学習で&lt;/div&gt;&lt;div&gt;設定させた方が早いのでは。&lt;/div&gt;&lt;div&gt;LSTM、DQNと試してきたが結果はイマイチといった感じ&lt;/div&gt;&lt;div&gt;パラメーターというか&lt;/div&gt;&lt;div&gt;各種分析から売買を行うかどうかを出力し、(ここまで人力のアルゴリズムと機械学習のパラメーター設置）&lt;/div&gt;&lt;div&gt;これを総合して売買の決断を決めるのを比較的小規模のネットワークにゆだねる形か&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="2030" y="168" width="600" height="110" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>

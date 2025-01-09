@@ -1,29 +1,21 @@
-
 import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib.animation as animation
 
-class GraphDrawer:
-    def __init__(self):
-        self.fig, self.ax = plt.subplots()
+# サンプルデータの作成
+x = np.arange(0, 10, 0.1)
+y = np.sin(x)
 
-    def update(self, value):
-        self.fig.delaxes(self.ax)    
-        self.ax = self.fig.add_subplot(111)
-        self.ax.plot(value)
-        plt.pause(0.1)
+# データがない期間を設定
+mask = (x < 3) | (x > 7)
+x = x[mask]
+y = y[mask]
 
-class DataGenerator:
-    def __init__(self, graph_drawer):
-        self.graph_drawer = graph_drawer
+fig, ax = plt.subplots()
+ax.plot(x, y)
 
-    def generate_data(self):
-        for i in range(200):
+# データがない期間を縮める
+ax.set_xlim(0, 10)
+ax.set_xticks([0, 3, 7, 10])
+ax.set_xticklabels(['0', '3', '7', '10'])
 
-            self.graph_drawer.update(np.random.rand(10))
-            
-
-if __name__ == "__main__":
-    graph = GraphDrawer()
-    data_generator = DataGenerator(graph)
-    data_generator.generate_data()
+plt.show()

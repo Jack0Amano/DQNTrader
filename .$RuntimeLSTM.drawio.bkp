@@ -1,0 +1,13 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.5 Chrome/126.0.6478.183 Electron/31.3.0 Safari/537.36" version="24.7.5">
+  <diagram name="ページ1" id="PraJ6ARP3TR6e9wYblwK">
+    <mxGraphModel dx="1434" dy="837" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1920" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-1" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;LSTMのランタイムでの学習と予測アルゴリズム&lt;/h1&gt;&lt;div&gt;LSTMを株価が更新されていくランタイムで学習しながら予測を繰り返すためのアルゴリズム。&lt;/div&gt;&lt;div&gt;DQNを考えていたが行動の成果がはっきりとわかる株の売買では、Q値の過剰評価など必要ない機能が多いため、単純にLSTMを予測させつつある程度の期間のデータが集まったらこれを学習を繰り返す機構。つまり単純な教師あり学習をランタイムで動くLSTMに適用しようということ。&lt;/div&gt;&lt;div&gt;LSTMの出力はDQNを模したactionsのQ値 [Nothing, Buy, Sell, TakeProfit]で。&lt;/div&gt;&lt;div&gt;入力は&lt;/div&gt;" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="110" y="180" width="560" height="270" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

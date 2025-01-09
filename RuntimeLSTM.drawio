@@ -1,0 +1,100 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.5 Chrome/126.0.6478.183 Electron/31.3.0 Safari/537.36" version="24.7.5">
+  <diagram name="ページ1" id="PraJ6ARP3TR6e9wYblwK">
+    <mxGraphModel dx="1434" dy="837" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="1920" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-1" value="&lt;h1 style=&quot;margin-top: 0px;&quot;&gt;LSTMのランタイムでの学習と予測アルゴリズム&lt;/h1&gt;&lt;div&gt;LSTMを株価が更新されていくランタイムで学習しながら予測を繰り返すためのアルゴリズム。&lt;/div&gt;&lt;div&gt;DQNを考えていたが行動の成果がはっきりとわかる株の売買では、Q値の過剰評価など必要ない機能が多いため、単純にLSTMを予測させつつある程度の期間のデータが集まったらこれを学習を繰り返す機構。つまり単純な教師あり学習をランタイムで動くLSTMに適用しようということ。&lt;/div&gt;&lt;div&gt;LSTMの出力はDQNを模したactionsのQ値 [Nothing, Buy, Sell, TakeProfit]で。&lt;/div&gt;&lt;div&gt;入力は[Closeの正規化値, Profitのpip値, ... 各種取得args]&lt;/div&gt;" style="text;html=1;whiteSpace=wrap;overflow=hidden;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="560" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="7utrK6tH0a4Ycz3FUUAE-5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="400" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-5" value="&lt;h3&gt;batch学習&lt;/h3&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="340" y="490" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;" edge="1" parent="1" source="7utrK6tH0a4Ycz3FUUAE-6">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="360" y="410" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-6" value="&lt;h3&gt;Action予測&lt;/h3&gt;" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="330" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=none;endFill=0;" edge="1" parent="1" source="7utrK6tH0a4Ycz3FUUAE-7" target="7utrK6tH0a4Ycz3FUUAE-8">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="440" y="400" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="360" y="440" />
+              <mxPoint x="360" y="400" />
+              <mxPoint x="440" y="400" />
+              <mxPoint x="440" y="360" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-7" value="&lt;h3&gt;Batchメモリー&lt;/h3&gt;" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="410" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;" edge="1" parent="1" source="7utrK6tH0a4Ycz3FUUAE-8">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="650" y="410" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-8" value="&lt;h3&gt;Action予測&lt;/h3&gt;" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="490" y="330" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;" edge="1" parent="1" source="7utrK6tH0a4Ycz3FUUAE-9">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="440" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;" edge="1" parent="1" source="7utrK6tH0a4Ycz3FUUAE-9">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="690" y="400" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="650" y="440" />
+              <mxPoint x="650" y="400" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-9" value="&lt;h3&gt;Batchメモリー&lt;/h3&gt;" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="490" y="410" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-16" value="Batchメモリーに規定数溜まるたびに学習を行う" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="260" y="550" width="280" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-17" value="学習に対するActionのみだと学習が進むごとに汎用性がなくなる&lt;div&gt;そのためアクションにランダムなものを混ぜることによって学習の内容に&lt;/div&gt;&lt;div&gt;多様性を持たせる。&lt;/div&gt;&lt;div&gt;またModelいDropoutを混ぜることでも学習の多様性は保たれる&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="410" y="580" width="420" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="7utrK6tH0a4Ycz3FUUAE-19">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="670" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-19" value="&lt;h3&gt;batch学習&lt;/h3&gt;" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="610" y="490" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-20" value="hidden_stateは[Action予測], [Batch学習]のたびにリセットする" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="230" y="668" width="360" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-21" value="&lt;div style=&quot;color: rgb(204, 204, 204); background-color: rgb(31, 31, 31); font-family: Consolas, &amp;quot;Courier New&amp;quot;, monospace; font-size: 14px; line-height: 19px; white-space-collapse: preserve;&quot;&gt;&lt;span style=&quot;color: #569cd6;&quot;&gt;def&lt;/span&gt; &lt;span style=&quot;color: #dcdcaa;&quot;&gt;__calculate_feature_profits&lt;/span&gt;(&lt;span style=&quot;color: #9cdcfe;&quot;&gt;self&lt;/span&gt;, &lt;span style=&quot;color: #9cdcfe;&quot;&gt;action&lt;/span&gt;, &lt;span style=&quot;color: #9cdcfe;&quot;&gt;target_price&lt;/span&gt;, &lt;span style=&quot;color: #9cdcfe;&quot;&gt;future_prices&lt;/span&gt;, &lt;span style=&quot;color: #9cdcfe;&quot;&gt;spreads&lt;/span&gt;) -&amp;gt; &lt;span style=&quot;color: #4ec9b0;&quot;&gt;list&lt;/span&gt;&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="110" y="830" width="720" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-22" value="&lt;div style=&quot;color: rgb(204, 204, 204); background-color: rgb(31, 31, 31); font-family: Consolas, &amp;quot;Courier New&amp;quot;, monospace; font-size: 14px; line-height: 19px; white-space-collapse: preserve;&quot;&gt;&lt;span style=&quot;color: #569cd6;&quot;&gt;def&lt;/span&gt; &lt;span style=&quot;color: #dcdcaa;&quot;&gt;calculate_reward&lt;/span&gt;(&lt;span style=&quot;color: #9cdcfe;&quot;&gt;self&lt;/span&gt;, &lt;span style=&quot;color: #9cdcfe;&quot;&gt;action&lt;/span&gt;, &lt;span style=&quot;color: #9cdcfe;&quot;&gt;current_price&lt;/span&gt;, &lt;span style=&quot;color: #9cdcfe;&quot;&gt;current_spread&lt;/span&gt;, &lt;span style=&quot;color: #9cdcfe;&quot;&gt;future_prices&lt;/span&gt;, &lt;span style=&quot;color: #9cdcfe;&quot;&gt;future_spread&lt;/span&gt;) -&amp;gt; &lt;span style=&quot;color: #4ec9b0;&quot;&gt;list&lt;/span&gt;&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="110" y="870" width="820" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-23" value="&lt;div style=&quot;color: rgb(204, 204, 204); background-color: rgb(31, 31, 31); font-family: Consolas, &amp;quot;Courier New&amp;quot;, monospace; font-size: 14px; line-height: 19px; white-space-collapse: preserve;&quot;&gt;&lt;span style=&quot;color: #569cd6;&quot;&gt;def&lt;/span&gt; &lt;span style=&quot;color: #dcdcaa;&quot;&gt;calculate_q_values&lt;/span&gt;(&lt;span style=&quot;color: #9cdcfe;&quot;&gt;self&lt;/span&gt;, &lt;span style=&quot;color: #9cdcfe;&quot;&gt;current_price&lt;/span&gt;, &lt;span style=&quot;color: #9cdcfe;&quot;&gt;current_spread&lt;/span&gt;, &lt;span style=&quot;color: #9cdcfe;&quot;&gt;future_sequence&lt;/span&gt;) -&amp;gt; &lt;span style=&quot;color: #4ec9b0;&quot;&gt;dict&lt;/span&gt;&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="110" y="910" width="670" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-24" value="これでActionのLabelを作成" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="140" y="940" width="170" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="7utrK6tH0a4Ycz3FUUAE-26" value="&lt;div style=&quot;color: rgb(204, 204, 204); background-color: rgb(31, 31, 31); font-family: Consolas, &amp;quot;Courier New&amp;quot;, monospace; font-size: 14px; line-height: 19px; white-space-collapse: preserve;&quot;&gt;&lt;span style=&quot;color: #569cd6;&quot;&gt;def&lt;/span&gt; &lt;span style=&quot;color: #dcdcaa;&quot;&gt;get_state&lt;/span&gt;(&lt;span style=&quot;color: #9cdcfe;&quot;&gt;self&lt;/span&gt;, &lt;span style=&quot;color: #9cdcfe;&quot;&gt;sequence_data&lt;/span&gt;: &lt;span style=&quot;color: #4ec9b0;&quot;&gt;pd&lt;/span&gt;.&lt;span style=&quot;color: #4ec9b0;&quot;&gt;DataFrame&lt;/span&gt;, &lt;span style=&quot;color: #9cdcfe;&quot;&gt;sequence_length&lt;/span&gt;&lt;span style=&quot;color: #d4d4d4;&quot;&gt;=&lt;/span&gt;&lt;span style=&quot;color: #b5cea8;&quot;&gt;1440&lt;/span&gt;) -&amp;gt; &lt;span style=&quot;color: #4ec9b0;&quot;&gt;np&lt;/span&gt;.&lt;span style=&quot;color: #dcdcaa;&quot;&gt;array&lt;/span&gt;&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1020" width="650" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
