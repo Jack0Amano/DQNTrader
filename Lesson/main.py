@@ -3,7 +3,7 @@ import random
 import pygame
 
 from entities import Player, Item
-from model import LSTMAgent
+from agent import RunTimeAgent
 
 
 # メインループ
@@ -146,7 +146,7 @@ max_items = 10
 # エージェントの作成
 state_size = 1 + (max_items * 2)  # 状態空間のサイズ
 action_size = 3  # 行動の数（左、そのまま、右）
-agent_model = LSTMAgent(state_size, action_size)
+agent_model = RunTimeAgent(state_size, action_size)
 
 # ゲームの開始
 game_loop(agent_model)

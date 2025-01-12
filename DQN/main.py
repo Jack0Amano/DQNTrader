@@ -5,7 +5,7 @@ import enum
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import time
-from model import DQNAgent
+from agent import DQNAgent
 from technicalAnalyzer import TechnicalAnalyzer
 import torch
 

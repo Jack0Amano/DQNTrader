@@ -6,10 +6,11 @@ import enum
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import time
-from model import LSTMAgent
+from agent import RunTimeAgent
 import torch
 import talib as ta
 import CommonAnalyzer as ca
+from sklearn.preprocessing import StandardScaler
 
 def interpolate(df: pd.DataFrame, start_index, end_index, crop=True) -> pd.DataFrame:
 
@@ -160,8 +161,17 @@ class Analyzer:
     """
     length = 60
 
-    def __init__(self):
-        pass
+    def __init__(self, total_df):
+        self.price_standard_scaler = StandardScaler()
+        closes = total_df['Close'].values
+        closes = closes.reshape(-1, 1)
+        self.price_standard_scaler.fit(closes)
+
+        self.volume_standard_scaler = StandardScaler()
+        volumes = total_df['Volume'].values
+        volumes = volumes.reshape(-1, 1)
+        self.volume_standard_scaler.fit(volumes)
+
 
     # ボリンジャーバンドは、移動平均線を中心に、上下に標準偏差の幅を取ったバンドを描くことで、
     # 価格の変動の範囲を示す指標です。
@@ -176,10 +186,27 @@ class Analyzer:
         sma = sma.dropna()
         std = std.dropna()
 
-        upperSigma = sma + std * sigma
-        lowerSigma = sma - std * sigma
-        gap = upperSigma - lowerSigma
-        return gap.values[-self.length:]
+        upper_band = sma + std * sigma
+        lower_band = sma - std * sigma
+        band_width = upper_band - lower_band
+
+        close_values = df.loc[upper_band.index[0]:upper_band.index[-1], 'Close']
+        price_positions = (close_values - lower_band) / (upper_band - lower_band)
+
+        upper_band = upper_band.values[-self.length:] / 100
+        lower_band = lower_band.values[-self.length:] / 100
+        band_width = band_width.values[-self.length:]
+        price_positions = price_positions.values[-self.length:]
+
+        upper_band = upper_band.reshape((upper_band.shape[0], 1))
+        lower_band = lower_band.reshape((lower_band.shape[0], 1))
+        band_width = band_width.reshape((band_width.shape[0], 1))
+        price_positions = price_positions.reshape((price_positions.shape[0], 1))
+
+        # band_widthの値はおよそ0~0.5であるためこれを0~1に正規化する
+        band_width = band_width / 0.5
+
+        return upper_band, lower_band, band_width, price_positions
 
     # RSIを計算
     # RSIは現在の相場の相対的な強弱を示す指標でボックス相場に強い
@@ -190,19 +217,13 @@ class Analyzer:
     def rsi(self, df, window=14, downtrend_threshold=0.7, uptrend_threshold=0.3) -> np.ndarray:
         """
         RSIを計算するメソッド   
-        return: [(0を上回ったら売りの可能性), (0を上回ったら買いの可能性)]   
+        return: []   
         """
         rsi: np.array = ta.RSI(df['Close'].values, timeperiod=window)
         rsi = rsi[~np.isnan(rsi)] / 100
-        
-        # 70%のラインを越えたら売りを見込む
-        downtrends = rsi - downtrend_threshold
-        downtrends = downtrends[-self.length:]
-        # 30%のラインを下回ったら買いを見込む
-        uptrends = (1 - rsi) - (1 - uptrend_threshold)
-        uptrends = uptrends[-self.length:]
-        output = np.array([uptrends, downtrends])
-        return output
+        rsi = rsi[-self.length:]
+        rsi = rsi.reshape((rsi.shape[0], 1))
+        return rsi
         
     # MACDは、移動平均線のクロスオーバーを利用して、トレンドの転換を捉える指標です。
     # このグラフの場合MACDがsignalを超えた時に買いトレンドで
@@ -217,41 +238,43 @@ class Analyzer:
         macd = macd[~np.isnan(macd)]
         macdsignal = macdsignal[~np.isnan(macdsignal)]
         # 
-        macd_cross_over = macd - macdsignal
-        macd_cross_over = macd_cross_over[-self.length:]
-        return macd_cross_over
+        macd_diff = macd - macdsignal
+        macd_diff = macd_diff[-self.length:]
+        macd_cross_direction = np.sign(np.diff(np.sign(macd_diff)))
+        macd_cross_direction = np.concatenate([[0], macd_cross_direction])
+        macd_cross_direction = macd_cross_direction.reshape((macd_cross_direction.shape[0], 1))
 
+        macd_diff = macd_diff.reshape((macd_diff.shape[0], 1))
+        # macd_cross_overの取る値は およそ 0.05 ~ -0.05であるためこれを-1~1に正規化する
+        macd_diff = macd_diff / 0.05
+        
+        return macd_diff, macd_cross_direction
     
     # ストキャスティクスは、過去の価格の範囲に対する現在の価格の位置を示す指標です。
     # MACDがトレンド相場で価格の反転が認識できるが、ストキャスティクスはボックス相場で有効です。
     # %Dが0～20%の範囲にある場合は売られ過ぎと見て買い
     # %Dが80～100%の範囲にある場合は買われ過ぎと見て売り
-    def stochastic_oscillator(self, df) -> np.ndarray:
+    def stochastic_value(self, df) -> np.ndarray:
         """
-        ストキャスティクスオシレータを計算するメソッド   
-        return: ゴールデンクロス&デッドクロス、overbought, oversold、トレンドフォロー
+        ストキャスティクスの値を取得するメソッド   
+        return: %K, %D
         """
         k, d = ta.STOCH(df['High'].values, df['Low'].values, df['Close'].values, fastk_period=5, slowk_period=3, slowd_period=3)
         k = k[~np.isnan(k)]
         d = d[~np.isnan(d)]
-        # ゴールデンクロス、デッドクロスを計算
-        golden_dead_cross = k - d
-        golden_dead_cross = golden_dead_cross[-self.length:]
-        # ダイバージェンス
-        # divergence = k 
-        # divergence = divergence[-self.length:]
-        overbought = k - 0.8
-        oversold = (1 - k) - (1 - 0.2)
-        # 中立域でのトレンド方向 トレンドフォロー
-        # トレンドフォローは 0.2, 0.8を越えるとトレンドフォローではなくoverbought, oversoldとなる
-        # 0.5を基準に上昇トレンドか下降トレンドかを判断する
-        trend = k - 0.5
-        trend = trend[-self.length:]
+        k = k[-self.length:] / 100
+        d = d[-self.length:] / 100
+        k = k.reshape((k.shape[0], 1))
+        d = d.reshape((d.shape[0], 1))
+        golden_dead_diff = k - d
+        golden_dead_cross = np.sign(np.diff(np.sign(golden_dead_diff.flatten())))
+        golden_dead_cross = np.concatenate([[0], golden_dead_cross])
+        golden_dead_cross = golden_dead_cross.reshape((golden_dead_cross.shape[0], 1))
+        # golden_dead_crossの取る値は およそ-0.3 ~ 0.3であるためこれを-1~1に正規化する
+        golden_dead_diff = golden_dead_diff / 0.3
+        return k, d, golden_dead_diff, golden_dead_cross
 
-        output = np.array([golden_dead_cross, overbought, oversold, trend])
-        return output
-
-    
+    # ADXは、トレンドの強さを示す指標です。
     def adx(self, df, window=14, trend_threshold=25) -> np.ndarray:
         """
         ADXを計算するメソッド   
@@ -262,373 +285,157 @@ class Analyzer:
         minus_di = ta.MINUS_DI(df['High'].values, df['Low'].values, df['Close'].values, timeperiod=window)
         plus_di = ta.PLUS_DI(df['High'].values, df['Low'].values, df['Close'].values, timeperiod=window)
         adx = adx[~np.isnan(adx)]
+        # adxの値はおよそ60が最高であるため50で割る
+        adx = adx[-self.length:]/50
         minus_di = minus_di[~np.isnan(minus_di)]
+        minus_di = minus_di[-self.length:]/50
         plus_di = plus_di[~np.isnan(plus_di)]
+        plus_di = plus_di[-self.length:]/50
         adx = adx / trend_threshold
         diff_di = plus_di - minus_di
 
         # トレンドの方向を示す
-        trend_direction = diff_di / adx.abs()
+        trend_direction = diff_di / abs(adx)
         trend = adx * trend_direction
-        trend = trend[-self.length:]
+
+        trend = trend.reshape((trend.shape[0], 1))
 
         return trend
+    
+    # ATRはボラティリティを計測できるため相場分類器の入力として使用
+    def atr(self, df, window=14) -> np.ndarray:
+        """
+        ATRを計算するメソッド   
+        return: ATR
+        """
+        atr = ta.ATR(df['High'].values, df['Low'].values, df['Close'].values, timeperiod=window)
+        atr = atr[~np.isnan(atr)]
+        atr = atr[-self.length:]
+        # ATRの幅はおよそ0~0.15であるためこれを0~1に正規化する
+        atr = atr / 0.15
+        atr = atr.reshape((atr.shape[0], 1))
+        return atr
+
+    def moving_average(self, df, window=5) -> np.ndarray:
+        """
+        移動平均を計算するメソッド   
+        return: 移動平均
+        """
+        ma = df['Close'].rolling(window=window).mean()
+        ma = ma.dropna()
+        ma = ma[-self.length:]
+        ma = ma.values.reshape((ma.shape[0], 1))
+        ma = self.price_standard_scaler.transform(ma)
+        return ma
+
+    def price(self, df):
+        """
+        値動きの値を正規化した物を取得する   
+        return: [[Open, High, Low, Close], ...]
+        """
+        # open = df['Open']
+        # open = (open - open.min()) / (open.max() - open.min())
+        # high = df['High']
+        # high = (high - high.min()) / (high.max() - high.min())
+        # low = df['Low']
+        # low = (low - low.min()) / (low.max() - low.min())
+        close = df['Close']
+        close = close[-self.length:]
+        close = close.values.reshape((close.shape[0], 1))
+        close = self.price_standard_scaler.transform(close)
+        return close
+    
+    def volume(self, df):
+        """
+        取引量を正規化した物を取得する
+        return: [[Volume(t)], [Volume(t+1)], ...]
+        """
+        volume = df['Volume']
+        volume = volume[-self.length:]
+        volume = np.array(volume)
+        volume = volume.reshape((volume.shape[0], 1))
+        volume = self.volume_standard_scaler.transform(volume)
+        return volume
     
 class Trader:
     orders_history = []
     current_order: Order = None
     first_time = None
-    # 利確圧力を加えていくまでの時間
-    limit_time_after_checkout = pd.Timedelta(minutes=120)
 
-    state_channels = {
-        "Close": False,
-        "Profit": False,
-        "OrderType": False,
-        "Volume": True,
-        "BollingerBand": True,
-        "RSI": True,
-        "MACD": True,
-    }
+    def __init__(self, length, total_df):
+        self.analyzer = Analyzer(total_df)
+        self.analyzer.length = length
 
-    def __init__(self):
-        self.analyzer = Analyzer()
-        self.close_intervals = []
-        self.profit_invtervals = []
-        self.order_type_intervals = []
-        self.volume_intervals = []
-        self.bollinger_band_intervals = []
-        self.rsi_intervals = []
-        self.macd_intervals = []
-
-    def show_intervals(self):
-        print("Close:", np.min(self.close_intervals), np.max(self.close_intervals), np.mean(self.close_intervals))
-        print("Profit:", np.min(self.profit_invtervals), np.max(self.profit_invtervals), np.mean(self.profit_invtervals))
-        print("OrderType:", np.min(self.order_type_intervals), np.max(self.order_type_intervals), np.mean(self.order_type_intervals))
-        print("Volume:", np.min(self.volume_intervals), np.max(self.volume_intervals), np.mean(self.volume_intervals))
-        print("BollingerBand:", np.min(self.bollinger_band_intervals), np.max(self.bollinger_band_intervals), np.mean(self.bollinger_band_intervals))
-        print("RSI:", np.min(self.rsi_intervals), np.max(self.rsi_intervals), np.mean(self.rsi_intervals))
-        print("MACD:", np.min(self.macd_intervals), np.max(self.macd_intervals), np.mean(self.macd_intervals))
-
-
-    def take_action(self, value: float, spread: float, time: pd.Timestamp, order_type: OrderType) -> tuple:
+    def get_state(self, sequence_data: pd.DataFrame) -> tuple:
         """
-        現在の価格と行う場合は注文を受け取り、注文を行う   
-        ここの報酬を変えることによって行動の評価を変えることができる   
-        つまりここはルールと報酬を決める部分である   
-        value: 現在の価格   
-        spread: スプレッド   
-        order_time: 現在の時間   
-        order_type: 注文の種類   
-        returns: (利益)
+        現在までの値動きの状態を取得する   
+        return (分類器, ボックス相場, トレンド相場)の各種入力データ
         """
-
-        if self.first_time is None:
-            self.first_time = time
-        
-        if self.current_order is None:
-            if order_type == OrderType.BUY:
-                self.current_order = Order(time, value, OrderType.BUY)
-                # print("Buy order is taken at", time, "Value is", value)
-                return 0
-            elif order_type == OrderType.SELL:
-                self.current_order = Order(time, value, OrderType.SELL)
-                # print("Sell order is taken at", time, "Value is", value)
-                return 0
-            elif order_type == OrderType.TAKE_PROFIT:
-                #print("There is no order to checkout")
-                return 0
-            elif order_type == OrderType.NOTHING:
-                # 最後の注文から一定時間経過している場合は報酬を減らしていく
-                if len(self.orders_history) > 0:
-                    last_order: Order = self.orders_history[-1]
-                    order_time_delta: pd.Timedelta = time - last_order.checkout_time
-                    if order_time_delta > self.limit_time_after_checkout:
-                        return 0
-                else:
-                    # first_timeから一定時間経過している場合は報酬を減らしていく
-                    # 何も買わずに終えるのを防ぐため
-                    order_time_delta: pd.Timedelta = time - self.first_time
-                    if order_time_delta > self.limit_time_after_checkout:
-                        return 0
-        else:
-            if order_type == OrderType.TAKE_PROFIT:
-                profit = self.current_order.checkout(time, value, spread)
-                # print("Checkout order is taken at", time, "Value is", value, "Profit is", profit)
-                self.orders_history.append(self.current_order)
-                pip = self.current_order.pip
-                self.current_order = None
-                return profit
-            elif order_type == OrderType.BUY or order_type == OrderType.SELL:
-                return 0
-            elif order_type == OrderType.NOTHING:
-                order_time_delta: pd.Timedelta = time - self.current_order.order_time
-                if order_time_delta > self.limit_time_after_checkout:
-                    profit = self.current_order.calculate_profit(time, value, spread)
-                    if profit < 0:
-                        return 0
-                    else:
-                        return 0
-                else:
-                    pass
-                    
-        return 0
-
-
-    def get_state(self, sequence_data: pd.DataFrame, sequence_length=1440) -> np.array:
-        """
-        現在の値動きの状態とorderの状態を取得する   
-        returnのprofit軸とorder_type軸はcurrentorderが無い時間は0で埋める   
-        sequence_data: -sequence_length分から現在のデータフレーム   
-        sequence_length: この長さにトリミングして返す      
-        returns: [[close(-sequence_length), ... close(current)],    
-                [profit(-sequence_length), ... profit(current)],   
-                [order_type(-sequence_length), ... order_type(current)]]  
-        """
-        output = []
-
-        start_time = datetime.datetime.now()
-
-        times = np.array(sequence_data.index[-sequence_length:])
-        closes = sequence_data['Close'].values[-sequence_length:]
-        spreads = np.array(sequence_data['Spread'].values[-sequence_length:])
-        profits = np.zeros(sequence_length)
-        order_type = np.zeros(sequence_length)
-
-        # output.append(times)
-
-        if self.state_channels["Close"]:
-            closes_normaled = (closes - closes.min()) / (closes.max() - closes.min()) 
-            closes_normaled = np.array(closes_normaled)
-            output.append(closes_normaled)
-
-        self.close_intervals.append((datetime.datetime.now() - start_time).total_seconds())
-        start_time = datetime.datetime.now()
-
-        
-        if self.state_channels["Profit"]:
-            # 範囲内のorders_historyとcurrent_orderのcalcurate_profitsをcalcuralte_profitを呼び出して更新
-            marged_profits = {}
-            if self.current_order is not None:
-                [self.current_order.calculate_profit(t, c, s) for c, s, t in zip(closes, spreads, times)]
-                marged_profits = self.current_order.calculate_profits.copy()
-            
-            for order in self.orders_history:
-                if times[0] > order.checkout_time:
-                    continue
-                times_in_order = times[(times >= order.order_time) & (times <= order.checkout_time)]
-                [order.calculate_profit(t, c, s) for c, s, t in zip(closes, spreads, times_in_order)]
-                marged_profits.update(order.calculate_profits)
-
-            update_series = pd.Series(marged_profits)
-            sequence_data = sequence_data.assign(Profit=update_series.reindex(sequence_data.index, fill_value=0))
-            profits = np.array(sequence_data['Profit'].values[-sequence_length:])
-
-            output.append(profits)
-
-        self.profit_invtervals.append((datetime.datetime.now() - start_time).total_seconds())
-        start_time = datetime.datetime.now()
-
-        if self.state_channels["OrderType"]:
-            # 注文の種類は 0,0,0,... ,(order), order_type(0), order_type(1)となる
-            if self.current_order is not None:
-                order_time = self.current_order.order_time.to_datetime64()
-                order_type = [self.current_order.order_type.value if t >= order_time else 0 for t in times]
-            
-            # 過去の注文がある場合もそれを埋める
-            for order in self.orders_history:
-                order_time = order.time.to_datetime64()
-                checkout_time = order.checkout_time.to_datetime64()
-                old_order_type = [order.order_type.value if t >= order_time and t <= checkout_time else ot for t, ot in zip(times, order_type)]
-                order_type = [max(ot, oot) for ot, oot in zip(order_type, old_order_type)]
-
-            output.append(order_type)
-        
-        self.order_type_intervals.append((datetime.datetime.now() - start_time).total_seconds())
-        start_time = datetime.datetime.now()
-
-        if self.state_channels["Volume"]:
-            volumes = np.array(sequence_data['Volume'].values[-sequence_length:])
-            output.append(volumes)
-
-        self.volume_intervals.append((datetime.datetime.now() - start_time).total_seconds())
-        start_time = datetime.datetime.now()
-
-        # ボリンジャーバンドの計算
-        if self.state_channels["BollingerBand"]:
-            bollinger_band = self.tec_analy.calculate_bollinger_bands(sequence_data)
-            gap2 = (bollinger_band["upper2Sigma"] - bollinger_band["lower2Sigma"]).dropna(how='all').to_frame("gap2")
-            gap2 = np.array(gap2.iloc[-sequence_length:]["gap2"].values)
-            output.append(gap2)
-
-        self.bollinger_band_intervals.append((datetime.datetime.now() - start_time).total_seconds())
-        start_time = datetime.datetime.now()
-        
-        # RSIの計算
-        if self.state_channels["RSI"]:
-            rsi = self.tec_analy.calculate_rsi(sequence_data)
-            rsi = np.array(rsi.iloc[-sequence_length:]["RSI"].values)
-            output.append(rsi)
-
-        self.rsi_intervals.append((datetime.datetime.now() - start_time).total_seconds())
-        start_time = datetime.datetime.now()
-        
-        # MACDの計算
-        if self.state_channels["MACD"]:
-            macd = self.tec_analy.calculate_macd(sequence_data)
-            macd = np.array(macd.iloc[-sequence_length:]["MACD"].values)
-            output.append(macd)
-        
-        self.macd_intervals.append((datetime.datetime.now() - start_time).total_seconds())
-        start_time = datetime.datetime.now()
-
-        return np.array(output)
-    
-    def get_state_new(self, sequence_data: pd.DataFrame) -> np.array:
 
         # ボリンジャーバンド
-        bollinger_band = self.analyzer.bollinger_band(sequence_data)
+        upper_band, lower_band, band_width, price_positions = self.analyzer.bollinger_band(sequence_data)
+        # ATR
+        atr = self.analyzer.atr(sequence_data)
         # RSI
         rsi = self.analyzer.rsi(sequence_data)
         # MACD
-        macd = self.analyzer.macd(sequence_data)
+        macd_diff, macd_cross = self.analyzer.macd(sequence_data)
         # ストキャスティクス
-        stochastic_oscillator = self.analyzer.stochastic_oscillator(sequence_data)
-        stochastic_trend = stochastic_oscillator[3]
-        stochastic_oscillator = stochastic_oscillator[:3]
+        stochastic_k, stochastic_d, golden_dead_diff, golden_dead_cross = self.analyzer.stochastic_value(sequence_data)
         # ADX
         adx = self.analyzer.adx(sequence_data)
+        # 値動きの値  
+        price = self.analyzer.price(sequence_data)
+        # 取引量
+        volumes = self.analyzer.volume(sequence_data)
+        # 移動平均
+        ma_5 = self.analyzer.moving_average(sequence_data)
+        ma_15 = self.analyzer.moving_average(sequence_data, 15)
 
-        # arrayの重ね方は 最初の方にボリンジャーバンド, 各解析のトレンド系, トレンド反転系
-        return np.array([bollinger_band, rsi, macd, stochastic_oscillator, stochastic_trend, adx])
+        # print("upper_band", upper_band.max(), upper_band.min())
+        # print("lower_band", lower_band.max(), lower_band.min())
+        # print("band_width", band_width.max(), band_width.min())
+        # print("price_positions", price_positions.max(), price_positions.min())
+        # print("rsi", rsi.max(), rsi.min())
+        # print("macd", macd.max(), macd.min())
+        # print("stochastic_k", stochastic_k.max(), stochastic_k.min())
+        # print("stochastic_d", stochastic_d.max(), stochastic_d.min())
+        # print("golden_dead_cross", golden_dead_cross.max(), golden_dead_cross.min())
+        # print("adx", adx.max(), adx.min())
+        # print("price", price.max(), price.min())
+        # print("volumes", volumes.max(), volumes.min())
+        # exit()
 
+        # 分類器の入力データ
+        classifier_x = np.concatenate([upper_band, lower_band, band_width, price_positions, atr], 1, dtype=np.float32)
+        #　トレンド相場の入力データ
+        trend_x = np.concatenate([price, ma_5, ma_15, volumes, macd_diff, macd_cross, adx], 1, dtype=np.float32)
+        # ボックス相場の入力データ        
+        box_x = np.concatenate([price, band_width, price_positions, rsi, stochastic_k, stochastic_d, golden_dead_diff, golden_dead_cross], 1, dtype=np.float32)
+        return classifier_x, box_x, trend_x
 
-        
-    def get_state_channel_size(self):
+    def get_label(self, df: pd.DataFrame, now, pip=0.001, window=13) -> np.ndarray:
         """
-        get_stateが返すのチャンネル数を取得する  
+        ラベルを取得する   
+        return: window後に価格がスプレッドを越えて上昇するか下降するか [横這い, 下降, 上昇]   
         """
-        return np.array(list(self.state_channels.values())).sum()
+        now_index = df.index.get_loc(now)
+        start = now_index + 1
+        end = now_index + window + 1
 
-    def __calculate_feature_profits(self, action, target_price, future_prices, spreads) -> list:
-        """
-        target_priceでの取引を行った場合の将来の利益を計算   
-        action: str, "Buy" or "Sell"
-        target_price: float, 未来の価格を予測するための基準価格 (ここでポジションを設定する)
-        future_prices: list[float], 未来の価格のリスト
-        """
-        if action == OrderType.BUY:
-            # Buy の場合の将来の利益
-            future_profits = []
-            for (fp, spread) in zip(future_prices, spreads):
-                future_profit = (fp - target_price) - spread
-                future_profits.append(future_profit)
-            return future_profits
-        elif action == OrderType.SELL:
-            # Sell の場合の将来の利益
-            future_profits = []
-            for (fp, spread) in zip(future_prices, spreads):
-                future_profit = (target_price - fp) - spread
-                future_profits.append(future_profit)
-            return future_profits
-    
-    def calculate_reward(self, action, current_price, current_spread, future_prices, future_spread) -> list:
-        """アクションに応じた報酬を計算"""
-        rewards = []
-        if action == OrderType.BUY:
-            if not self.current_order:
-                feature_profits = self.__calculate_feature_profits(OrderType.BUY, current_price, future_prices, future_spread)
-                if max(feature_profits) > 0:
-                    # 将来の価格変動から利益が出せる場合
-                    rewards = feature_profits
-                else:
-                    rewards.append(-1)
-            else:
-                rewards.append(0)
-        elif action == OrderType.SELL:
-            if not self.current_order:
-                feature_profits = self.__calculate_feature_profits(OrderType.SELL, current_price, future_prices, future_spread)
-                if max(feature_profits) > 0:
-                    rewards = feature_profits
-                else:
-                    rewards.append(-1)
-            else:
-                rewards.append(0)
-        elif action == OrderType.TAKE_PROFIT:
-            if self.current_order:
-                if self.current_order.order_type == OrderType.BUY:
-                    reward = (current_price - self.current_order.raw_value) - current_spread
-                elif self.current_order.order_type == OrderType.SELL:
-                    reward = (self.current_order.raw_value - current_price) - current_spread
-                rewards.append(reward)
-            else:
-                rewards.append(0)  # ポジションがない場合の報酬は 0
-        elif action == OrderType.NOTHING:
-            if self.current_order is None:
-                # ポジションがない場合、将来の価格変動から利益が出せるかチェック
-                buy_profitable = any((fp - current_price) - current_spread > 0 for fp in future_prices)
-                sell_profitable = any((current_price - fp) - current_spread > 0 for fp in future_prices)
-                if buy_profitable or sell_profitable:
-                    # 利益を出せる可能性があるため、機会損失としてマイナス報酬
-                    # 最大利益の期待値をマイナスとして設定
-                    possible_rewards = []
-                    for (fp, spread) in zip(future_prices, future_spread):
-                        possible_buy = (fp - current_price) - spread
-                        possible_sell = (current_price - fp) - spread
-                        possible_rewards.append(max(possible_buy, possible_sell, 0))
-                    reward = -np.mean([r for r in possible_rewards if r > 0])  # 平均機会損失
-                    rewards.append(reward)
-                else:
-                    # 利益を出せないため、報酬は 0
-                    rewards.append(0)
-            else:
-                # ポジションがある場合
-                # TakeProfit が必要かどうかを判断
-                if self.current_order.order_type == OrderType.BUY:
-                    # 現在の価格とポジション価格から利益が出ているか
-                    current_profit = current_price - self.current_order.raw_value
-                elif self.current_order.order_type == OrderType.SELL:
-                    current_profit = self.current_order.raw_value - current_price
-                else:
-                    current_profit = 0
+        now_close = df.loc[now, 'Close']
 
-                # 将来の期待利益を計算
-                buy_profit = max(self.__calculate_feature_profits(OrderType.BUY, self.current_order.raw_value, future_prices, future_spread))
-                sell_profit = max(self.__calculate_feature_profits(OrderType.SELL, self.current_order.raw_value, future_prices, future_spread))
-                max_future_profit = max([buy_profit, sell_profit], default=0)
-                
-                if current_profit > max_future_profit:
-                    # 現在が最大の利益の場合、現在利確すべきであるためNothingの報酬は -current_profit
-                    rewards.append(-current_profit)
-                else:
-                    # 現在の利益より期待される未来の利益が大きい場合、ポジションを保持するためにNothingの報酬はmax_future_profit
-                    rewards.append(max_future_profit)
-        return rewards
+        feature_spread = df.iloc[start:end]['Spread'].mean() * pip
+        feature_high = df.iloc[start:end]['High'].mean()
+        feature_low = df.iloc[start:end]['Low'].mean()
+        feature_mean = (feature_high + feature_low) / 2
 
-    def calculate_q_values(self, current_price, current_spread, future_sequence) -> dict:
-        """
-        各アクションのQ値を計算   
-        current_price: 現在の価格   
-        future_sequence: 未来の価格のデータフレーム 
-        future_sequenceの長さがLabelの予測能となるため、modelの予測間隔を調整する場合これを変更する必要がある重要なパラメーター   
-        """
-        future_prices = future_sequence['Close'].values
-        future_spread = future_sequence['Spread'].values
-
-        actions = [OrderType.NOTHING, OrderType.BUY, OrderType.SELL, OrderType.TAKE_PROFIT]
-        q_values = {}
-        for action in actions:
-            if action == OrderType.TAKE_PROFIT and not self.current_order:
-                # ポジションがない場合、TakeProfitは無効
-                q_values[action] = -10  # 無効な選択肢として極小値を設定
-            elif (action == OrderType.BUY or action == OrderType.SELL) and self.current_order:
-                # ポジションがある場合、Buy と Sell は無効
-                q_values[action] = -10  # 無効な選択肢として極小値を設定
-            else:
-                rewards = self.calculate_reward(action, current_price, current_spread, future_prices, future_spread)
-                q_values[action] = np.mean(rewards)  # 平均で期待値を計算
-        return q_values
-
+        if feature_mean - now_close > feature_spread:
+            return np.array([[0, 0, 1]], dtype=np.float32)
+        elif now_close - feature_mean > feature_spread:
+            return np.array([[0, 1, 0]], dtype=np.float32)
+        else:
+            return np.array([[1, 0, 0]], dtype=np.float32)
 
 
 class TraderDrawer:
@@ -693,119 +500,136 @@ def notify_sound():
     # 1000Hzで1秒間鳴らす
     winsound.Beep(500, 500)
 
-if __name__ == "__main__":
-    torch.autograd.set_detect_anomaly(True)
-    path = "D:/TestAdvisor/Analyzers/Data/RawData/USDJPY/2015.01.02_2015.12.30.json"
+def load_df(path):
+    """
+    データを読み込む   
+    """
     df = pd.read_json(path)
     df.columns = map(str.capitalize, df.columns)
     df['Current'] = pd.to_datetime(df['Current'])
     df = df.set_index('Current')
+    return df
+
+if __name__ == "__main__":
+    train_path = "D:/TestAdvisor/Analyzers/Data/RawData/USDJPY/2015.01.02_2015.12.30.json"
+    test_path = "D:/TestAdvisor/Analyzers/Data/RawData/USDJPY/2016.01.04_2016.12.30.json"
+
+    train_df = load_df(train_path)
+    test_df = load_df(test_path)
+
+    train_start_time = train_df.index[0]
+    train_end_time = pd.Timestamp("2015-12-30")
+
+    test_start_time = pd.Timestamp("2016-02-29")
+    test_end_time = pd.Timestamp("2016-06-29")
+
+    train_df = train_df.loc[(train_df.index >= train_start_time) & (train_df.index <= train_end_time)]
+    test_df = test_df.loc[(test_df.index >= test_start_time) & (test_df.index <= test_end_time)]
 
     pips = 0.01
-    # interpolated_data = interpolate_df(df)
-    interpolated_data = df
-    # interpolated_data.loc[:, 'Close'] = interpolated_data.loc[:, 'Close'] / pips
-    # interpolated_data.loc[:, 'High'] = interpolated_data.loc[:, 'High'] / pips
-    # interpolated_data.loc[:, 'Low'] = interpolated_data.loc[:, 'Low'] / pips
-    # interpolated_data.loc[:, 'Open'] = interpolated_data.loc[:, 'Open'] / pips
-    # interpolated_data.loc[:, 'Spread'] = interpolated_data.loc[:, 'Spread'] / pips
 
-    # 12時間程度で過学習になって上昇が止まる、10時間くらいのスパンで行ったほうがいいか
-    # またmodelにdropoutなどを採用して過学習を防ぐ
-    # DRQNに変更して過去の状態を考慮する
-    # もしくはR2D2を採用
-
-    # double dqnはTargetとQnetを使い分ける奴なのでこの初期コードですでに実現されている
     # 入力の長さ
-    input_sequence_length = 512
+    input_sequence_length = 60
     # データを切り取る長さ 解析の際に戦闘のパディングが必要なためinput_sequence_lengthより長い必要がある
-    sequence_length = int(input_sequence_length * 1.5)
-    # ラベルが考慮する値動きの長さ これを調整するとmodelがどの程度までの値動きを考慮するか変わる
-    label_sequence_length = 30
+    sequence_length = int(input_sequence_length * 4)
+    # ラベルが考慮する期間の長さ
+    label_sequence_length = 13
 
-    trader = Trader()
-    state_channels = trader.get_state_channel_size()
-    print("State Channel Size is", state_channels)
-    # draw_trader = TraderDrawer()
+    train_trader = Trader(input_sequence_length, train_df)
+    test_trader = Trader(input_sequence_length, test_df)
 
-    agent_model = LSTMAgent(sequence_length=input_sequence_length, state_channel_size=state_channels, batch_size=180)
+    classifier_dim = 5
+    box_dim = 8
+    trend_dim = 7
+    label_dim = 3
 
-    total_profit = 0
-    min_limit_profit = -10000
-    done = False
+    agent_model = RunTimeAgent(classifier_dim, box_dim, trend_dim, label_sequence_length)
 
-    profit_histries = np.array([[interpolated_data.index[sequence_length], 0]])
-
-    limit_time = 60 * 24 * 16
-
-    learning_times = []
-
-    last_cmd_time = interpolated_data.index[0]
-    show_cmd_time_interval = pd.Timedelta(minutes=120)
-
-    tecAnalyzer = TechnicalAnalyzer()
+    last_cmd_time = train_df.index[0]
+    show_cmd_time_interval = pd.Timedelta(days=1)
 
     print("Start learning:", datetime.datetime.now())
 
-    for i in range(0, len(interpolated_data) - sequence_length, 1):
-        sequence = interpolated_data[i:i+sequence_length]
+    epoch = 10
+    
+    train_loss_history = []
+    test_loss_history = []
 
-        if (i > limit_time):
-            break
+    # agent_model.load_model("models/agent_model.pth")
 
-        now = sequence.index[-1]
-        if now - last_cmd_time > show_cmd_time_interval:
-            remove_cmd_line()
-            print(now, end="", flush=True)
-            last_cmd_time = now
-        close = sequence.iloc[-1]['Close']
-        spread = sequence.iloc[-1]['Spread']
+    model_name = "agent_model_2"
 
-        g_state = trader.get_state(sequence, input_sequence_length)
+    for e in range(epoch):
+        # trainデータでの学習を行う
+        train_loss = []
+        last_cmd_time = train_df.index[0]
+        for i in range(0, len(train_df) - sequence_length, 1):
+            sequence = train_df[i:i+sequence_length]
 
-        # index=0がgraph用のtimeなので削除
-        state = g_state[1:].astype(np.float32)
-        # stateのshapeが (input_size, sequence_length) なので(input_size, sequence_length)に変換
-        state = np.array(np.split(state, state.shape[1], axis=1)).squeeze(2).astype(np.float32)
+            now = sequence.index[-1]
+            if now - last_cmd_time > show_cmd_time_interval:
+                last_cmd_time = now
+                remove_cmd_line()
+                print(now, end="", flush=True)
 
-        order_raw_value = agent_model.action(state)
-        order_type = OrderType(order_raw_value)
-        
-        profit = trader.take_action(close, spread, now, order_type)
-        # next_state = trader.get_state(sequence, input_sequence_length)
-        # next_state = next_state[1:].astype(np.float32)
-        # next_state = np.array(np.split(next_state, next_state.shape[1], axis=1)).squeeze(2).astype(np.float32)
+            classifier_x, box_x, trend_x = train_trader.get_state(sequence)
+            label = train_trader.get_label(train_df, now, window=label_sequence_length)
 
-        feature_sequence = interpolated_data[i+1:i+label_sequence_length+1]
-        label_q_values = trader.calculate_q_values(close, spread, feature_sequence)
-        label_q_values = np.array(list(label_q_values.values()), dtype=np.float32)
+            agent_model.remember(classifier_x, box_x, trend_x, label)
+            training_loss = agent_model.replay(True)
 
-        total_profit += profit
-        if profit != 0:
-            profit_histries = np.append(profit_histries, [[now, total_profit]], axis=0)
+            if training_loss is not None:
+                train_loss.append(training_loss)
+        agent_model.clear_memory()
+        agent_model.clear_hidden_state()
+        train_loss_mean = np.mean(train_loss)
+        train_loss_history.append(train_loss_mean)
 
-        if total_profit < min_limit_profit:
-            done = True
-        done = total_profit < min_limit_profit
+        print("\nEpoch:", e, "Train loss:", train_loss_mean)
 
-        agent_model.remember(state, order_raw_value, label_q_values, profit)
-        learning = agent_model.replay()
+        # testデータでの評価を行う
+        test_loss = []
+        last_cmd_time = test_df.index[0]
+        for i in range(0, len(test_df) - sequence_length, 1):
+            sequence = test_df[i:i+sequence_length]
+            now = sequence.index[-1]
+            if now - last_cmd_time > show_cmd_time_interval:
+                last_cmd_time = now
+                remove_cmd_line()
+                print(now, end="", flush=True)
 
-        if learning:
-            learning_times.append(now)
+            classifier_x, box_x, trend_x = test_trader.get_state(sequence)
+            label = test_trader.get_label(test_df, now, window=label_sequence_length)
+
+            agent_model.remember(classifier_x, box_x, trend_x, label)
+            test_run_loss = agent_model.replay(False)
+
+            if test_run_loss is not None:
+                test_loss.append(test_run_loss)
+        agent_model.clear_memory()
+        agent_model.clear_hidden_state()
+        test_loss_mean = np.mean(test_loss)
+        test_loss_history.append(test_loss_mean)
+
+        print("\nEpoch:", e, "Train loss:", train_loss_mean, "Test loss:", test_loss_mean)
+        agent_model.save_model(f"models/{model_name}_{e}.pth")
     
     notify_sound()
     print("\nEnd learning:", datetime.datetime.now())
-    trader.show_intervals()
-    
-    profits = [ o.profit_pips for o in trader.orders_history]
-    profits = np.cumsum(profits)
-    times = [o.checkout_time for o in trader.orders_history]
+
+    # draw graph
+    train_loss_history = np.array(train_loss_history)
+    test_loss_history = np.array(test_loss_history)
+
     fig, ax = plt.subplots()
-    ax.plot(times, profits, label="Profit")
-    for learning_time in learning_times:
-        ax.axvline(learning_time, color='r', linestyle='--', linewidth=0.5)
-    plt.savefig("models/bidirectional.png")
+    fig.autofmt_xdate()
+    ax.plot(train_loss_history, label="Train Loss")
+    ax.plot(test_loss_history, label="Test Loss")
+
+    ax.legend()
+    plt.savefig("models/loss2.png")
     plt.show()
+
+    
     
 
