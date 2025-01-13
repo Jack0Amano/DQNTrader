@@ -60,7 +60,9 @@ class BoxMarketAnalyzer(nn.Module):
         
         out, (h_0, c_0) = self.lstm(x)
         out_logit = self.fc(out[:, -1, :])
-        out = F.softmax(out_logit, dim=1)
+
+        out = out_logit
+        #out = F.softmax(out_logit, dim=1)
         return out, out_logit, (h_0, c_0)
     
 # トレンド相場分析器
@@ -88,7 +90,9 @@ class TrendMarketAnalyzer(nn.Module):
         
         out, (h_0, c_0) = self.lstm(x)
         out_logit = self.fc(out[:, -1, :])
-        out = F.softmax(out_logit, dim=1)
+
+        out = out_logit
+        # out = F.softmax(out_logit, dim=1)
         return out, out_logit, (h_0, c_0)
     
 

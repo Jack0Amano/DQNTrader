@@ -28,7 +28,7 @@ class PrioritizedReplayBuffer:
         trend_x = trend_x[:batch_size]
         labels = np.concatenate(labels[:batch_size], axis=0)
         # クラスインデックスに変換 損失関数がCrossEntropyLossの場合
-        labels = np.argmax(labels, axis=1)
+        # labels = np.argmax(labels, axis=1)
 
         self.memory = self.memory[batch_size:]
 
@@ -58,7 +58,8 @@ class RunTimeAgent:
         # modelのhidden_stateを保持するための変数
         self.batch_size = batch_size
         self.label_sequence_length = label_sequence_length
-        self.criterion = nn.CrossEntropyLoss()
+        # self.criterion = nn.CrossEntropyLoss()
+        self.criterion = nn.BCEWithLogitsLoss()
         self.frame = 0
 
         self.classifier_hidden_state = None

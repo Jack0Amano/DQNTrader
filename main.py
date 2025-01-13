@@ -557,7 +557,7 @@ if __name__ == "__main__":
 
     # agent_model.load_model("models/agent_model.pth")
 
-    model_name = "agent_model_2"
+    model_name = "agent_model_3"
 
     for e in range(epoch):
         # trainデータでの学習を行う
