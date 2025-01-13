@@ -519,10 +519,10 @@ if __name__ == "__main__":
     test_df = load_df(test_path)
 
     train_start_time = train_df.index[0]
-    train_end_time = pd.Timestamp("2015-01-30")
+    train_end_time = pd.Timestamp("2015-12-30")
 
     test_start_time = pd.Timestamp("2016-02-29")
-    test_end_time = pd.Timestamp("2016-03-29")
+    test_end_time = pd.Timestamp("2016-06-29")
 
     train_df = train_df.loc[(train_df.index >= train_start_time) & (train_df.index <= train_end_time)]
     test_df = test_df.loc[(test_df.index >= test_start_time) & (test_df.index <= test_end_time)]
@@ -548,7 +548,7 @@ if __name__ == "__main__":
 
     print("Start learning:", datetime.datetime.now())
 
-    epoch = 10
+    epoch = 128
     
     train_loss_history = []
     test_loss_history = []
@@ -560,12 +560,14 @@ if __name__ == "__main__":
     train_data = None
     test_data = None
 
+    is_cash_data_exist = False
     # キャッシュがある場合はそれを使用する
     if os.path.exists(f"cash/{model_name}_train_data.npy"):
         train_data = np.load(f"cash/{model_name}_train_data.npy", allow_pickle=True).item()
     if os.path.exists(f"cash/{model_name}_test_data.npy"):
         test_data = np.load(f"cash/{model_name}_test_data.npy", allow_pickle=True).item()
         print("Load cash data")
+        is_cash_data_exist = True
 
     for e in range(epoch):
         # trainデータでの学習を行う
@@ -618,7 +620,7 @@ if __name__ == "__main__":
                 test_loss.append(test_run_loss)
                 remove_cmd_line()
                 print(test_times[-1], end="", flush=True)
-                
+
         test_data = agent_model.memory.get_memory()
         agent_model.clear_memory()
         agent_model.clear_hidden_state()
@@ -627,12 +629,13 @@ if __name__ == "__main__":
 
         lr = agent_model.get_learning_rate()
         print("\nEpoch:", e, "Train loss:", train_loss_mean, "Test loss:", test_loss_mean, "Learning rate:", lr)
-        agent_model.step_scheduler()
+        agent_model.step_scheduler(test_loss_mean)
         agent_model.save_model(f"models/{model_name}_{e}.pth")
 
-    # 解析データをキャッシュとして保存
-    np.save(f"cash/{model_name}_train_data.npy", train_data)
-    np.save(f"cash/{model_name}_test_data.npy", test_data)
+    if is_cash_data_exist:
+        # 解析データをキャッシュとして保存
+        os.remove(f"cash/{model_name}_train_data.npy")
+        os.remove(f"cash/{model_name}_test_data.npy")
     
     notify_sound()
     print("\nEnd learning:", datetime.datetime.now())

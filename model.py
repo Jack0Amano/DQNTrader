@@ -59,11 +59,9 @@ class BoxMarketAnalyzer(nn.Module):
             c_0 = torch.zeros(num_directions * self.lstm.num_layers, batch_size, self.lstm.hidden_size).to(x.device)
         
         out, (h_0, c_0) = self.lstm(x)
-        out_logit = self.fc(out[:, -1, :])
 
-        out = out_logit
-        #out = F.softmax(out_logit, dim=1)
-        return out, out_logit, (h_0, c_0)
+        out_logit = self.fc(out[:, -1, :])
+        return out_logit, out_logit, (h_0, c_0)
     
 # トレンド相場分析器
 class TrendMarketAnalyzer(nn.Module):
@@ -91,9 +89,7 @@ class TrendMarketAnalyzer(nn.Module):
         out, (h_0, c_0) = self.lstm(x)
         out_logit = self.fc(out[:, -1, :])
 
-        out = out_logit
-        # out = F.softmax(out_logit, dim=1)
-        return out, out_logit, (h_0, c_0)
+        return out_logit, out_logit, (h_0, c_0)
     
 
 # 相場によってモデルを切り替えるハイブリッドモデル

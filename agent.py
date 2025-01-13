@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from model import HybridModel
 from torch.optim.lr_scheduler import StepLR
-
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 # 優先度付き経験再生バッファの定義
 class PrioritizedReplayBuffer:
@@ -130,7 +130,7 @@ class RunTimeAgent:
         trend_input_dim,
         label_sequence_length,
         batch_size=2048,
-        learning_rate=0.01,
+        learning_rate=0.005,
         
     ):
         self.memory = PrioritizedReplayBuffer()
@@ -138,7 +138,7 @@ class RunTimeAgent:
         self.model= HybridModel(classifier_input_dim, box_input_dim, trend_input_dim).to("cuda")
         # Adamオプティマイザを使用してネットワークのパラメータを最適化
         self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
-        self.scheduler = StepLR(self.optimizer, step_size=2, gamma=0.5)
+        self.scheduler = ReduceLROnPlateau(self.optimizer, mode="min", factor=0.5, patience=5, verbose=True)
         # modelのhidden_stateを保持するための変数
         self.batch_size = batch_size
         self.label_sequence_length = label_sequence_length
@@ -264,18 +264,18 @@ class RunTimeAgent:
     def load_model(self, path):
         self.model.load_state_dict(torch.load(path, weights_only=True))
 
-    def step_scheduler(self):
+    def step_scheduler(self, loss):
         """
         learning_rateを可変するスケジューラーを1ステップ進める   
         """
-        self.scheduler.step()
+        self.scheduler.step(loss)
 
     def get_learning_rate(self) -> float:
         """
         スケジューラーによって設定された学習率を取得するメソッド   
         return: 学習率 float
         """
-        return self.optimizer.param_groups[0]["lr"]
+        return self.scheduler.get_last_lr()[0]
 
 if __name__ == "__main__":
 
