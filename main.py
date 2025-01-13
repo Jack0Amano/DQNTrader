@@ -1,4 +1,5 @@
 import datetime
+import os
 import sys
 import pandas as pd
 import numpy as np
@@ -518,10 +519,10 @@ if __name__ == "__main__":
     test_df = load_df(test_path)
 
     train_start_time = train_df.index[0]
-    train_end_time = pd.Timestamp("2015-12-30")
+    train_end_time = pd.Timestamp("2015-01-30")
 
     test_start_time = pd.Timestamp("2016-02-29")
-    test_end_time = pd.Timestamp("2016-06-29")
+    test_end_time = pd.Timestamp("2016-03-29")
 
     train_df = train_df.loc[(train_df.index >= train_start_time) & (train_df.index <= train_end_time)]
     test_df = test_df.loc[(test_df.index >= test_start_time) & (test_df.index <= test_end_time)]
@@ -545,9 +546,6 @@ if __name__ == "__main__":
 
     agent_model = RunTimeAgent(classifier_dim, box_dim, trend_dim, label_sequence_length)
 
-    last_cmd_time = train_df.index[0]
-    show_cmd_time_interval = pd.Timedelta(days=1)
-
     print("Start learning:", datetime.datetime.now())
 
     epoch = 10
@@ -557,62 +555,84 @@ if __name__ == "__main__":
 
     # agent_model.load_model("models/agent_model.pth")
 
-    model_name = "agent_model_3"
+    model_name = "agent_model_Schedule_3"
+
+    train_data = None
+    test_data = None
+
+    # キャッシュがある場合はそれを使用する
+    if os.path.exists(f"cash/{model_name}_train_data.npy"):
+        train_data = np.load(f"cash/{model_name}_train_data.npy", allow_pickle=True).item()
+    if os.path.exists(f"cash/{model_name}_test_data.npy"):
+        test_data = np.load(f"cash/{model_name}_test_data.npy", allow_pickle=True).item()
+        print("Load cash data")
 
     for e in range(epoch):
         # trainデータでの学習を行う
         train_loss = []
-        last_cmd_time = train_df.index[0]
+        # 既に解析済みの入力データとラベルがある場合はそれを使用する
+        if train_data is not None:
+            agent_model.memory.set_memory(train_data)
+        # 学習を行う
         for i in range(0, len(train_df) - sequence_length, 1):
-            sequence = train_df[i:i+sequence_length]
+            # まだ解析済みのデータがない場合は解析を行う eopch=0の時のみ
+            if train_data is None:
+                sequence = train_df[i:i+sequence_length]
+                now = sequence.index[-1]
+                classifier_x, box_x, trend_x = train_trader.get_state(sequence)
+                label = train_trader.get_label(train_df, now, window=label_sequence_length)
+                agent_model.remember(classifier_x, box_x, trend_x, label, now)
 
-            now = sequence.index[-1]
-            if now - last_cmd_time > show_cmd_time_interval:
-                last_cmd_time = now
-                remove_cmd_line()
-                print(now, end="", flush=True)
-
-            classifier_x, box_x, trend_x = train_trader.get_state(sequence)
-            label = train_trader.get_label(train_df, now, window=label_sequence_length)
-
-            agent_model.remember(classifier_x, box_x, trend_x, label)
-            training_loss = agent_model.replay(True)
+            training_loss, train_times = agent_model.replay(True)
 
             if training_loss is not None:
                 train_loss.append(training_loss)
+                remove_cmd_line()
+                print(train_times[-1], end="", flush=True)
+        
+        train_data = agent_model.memory.get_memory()
         agent_model.clear_memory()
         agent_model.clear_hidden_state()
         train_loss_mean = np.mean(train_loss)
         train_loss_history.append(train_loss_mean)
 
-        print("\nEpoch:", e, "Train loss:", train_loss_mean)
+        print("\n", end="", flush=True)
 
         # testデータでの評価を行う
         test_loss = []
-        last_cmd_time = test_df.index[0]
+        # 既に解析済みの入力データとラベルがある場合はそれを使用する
+        if test_data is not None:
+            agent_model.memory.set_memory(test_data)
+        # 評価を行う
         for i in range(0, len(test_df) - sequence_length, 1):
-            sequence = test_df[i:i+sequence_length]
-            now = sequence.index[-1]
-            if now - last_cmd_time > show_cmd_time_interval:
-                last_cmd_time = now
-                remove_cmd_line()
-                print(now, end="", flush=True)
-
-            classifier_x, box_x, trend_x = test_trader.get_state(sequence)
-            label = test_trader.get_label(test_df, now, window=label_sequence_length)
-
-            agent_model.remember(classifier_x, box_x, trend_x, label)
-            test_run_loss = agent_model.replay(False)
+            if test_data is None:
+                sequence = test_df[i:i+sequence_length]
+                now = sequence.index[-1]
+                classifier_x, box_x, trend_x = test_trader.get_state(sequence)
+                label = test_trader.get_label(test_df, now, window=label_sequence_length)
+                agent_model.remember(classifier_x, box_x, trend_x, label, now)
+            
+            test_run_loss, test_times = agent_model.replay(False)
 
             if test_run_loss is not None:
                 test_loss.append(test_run_loss)
+                remove_cmd_line()
+                print(test_times[-1], end="", flush=True)
+                
+        test_data = agent_model.memory.get_memory()
         agent_model.clear_memory()
         agent_model.clear_hidden_state()
         test_loss_mean = np.mean(test_loss)
         test_loss_history.append(test_loss_mean)
 
-        print("\nEpoch:", e, "Train loss:", train_loss_mean, "Test loss:", test_loss_mean)
+        lr = agent_model.get_learning_rate()
+        print("\nEpoch:", e, "Train loss:", train_loss_mean, "Test loss:", test_loss_mean, "Learning rate:", lr)
+        agent_model.step_scheduler()
         agent_model.save_model(f"models/{model_name}_{e}.pth")
+
+    # 解析データをキャッシュとして保存
+    np.save(f"cash/{model_name}_train_data.npy", train_data)
+    np.save(f"cash/{model_name}_test_data.npy", test_data)
     
     notify_sound()
     print("\nEnd learning:", datetime.datetime.now())

@@ -5,38 +5,121 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from model import HybridModel
+from torch.optim.lr_scheduler import StepLR
 
 
 # 優先度付き経験再生バッファの定義
 class PrioritizedReplayBuffer:
     def __init__(self):
-        self.memory = []  # 経験を保存するリスト
+        self.cursor_index = 0
+        self.classifier_memory = []
+        self.box_memory = []
+        self.trend_memory = []
+        self.label_memory = []
+        self.time_memory = []
 
     # 経験をバッファに追加
-    def add(self, classifier_x, box_x, trend_x, label):
-        experience = (classifier_x, box_x, trend_x, label)
-        self.memory.append(experience)
+    def add(self, classifier_x, box_x, trend_x, label, time):
+        """
+        経験をメモリに追加する
+        """
+        self.classifier_memory.append(classifier_x)
+        self.box_memory.append(box_x)
+        self.trend_memory.append(trend_x)
+        self.label_memory.append(label)
+        self.time_memory.append(time)
+        
+        # if self.classifier_memory is None:
+        #     self.classifier_memory = [classifier_x]
+        #     self.box_memory = [box_x]
+        #     self.trend_memory = [trend_x]
+        #     self.label_memory = np.array([label])
+        # else:
+        #     self.classifier_memory = np.append(self.classifier_memory, np.array([classifier_x]), axis=0)
+        #     self.box_memory = np.append(self.box_memory, np.array([box_x]), axis=0)
+        #     self.trend_memory = np.append(self.trend_memory, np.array([trend_x]), axis=0)
+        #     self.label_memory = np.append(self.label_memory, np.array([label]), axis=0)
 
-    def pop(self, batch_size):
+
+    def get(self, batch_size):
         """
-        メモリの先頭からバッチサイズ分の経験を取り出しメモリから消す   
+        メモリの先頭からバッチサイズ分の経験を取り出しカーソルを動かす
         """
-        classifier_x, box_x, trend_x, labels = zip(*self.memory)
         # 古い経験から優先してサンプリング
-        classifier_x = classifier_x[:batch_size]
-        box_x = box_x[:batch_size]
-        trend_x = trend_x[:batch_size]
-        labels = np.concatenate(labels[:batch_size], axis=0)
+        classifier_x = np.array(self.classifier_memory[self.cursor_index:batch_size+self.cursor_index])
+        box_x = np.array(self.box_memory[self.cursor_index:batch_size+self.cursor_index])
+        trend_x = np.array(self.trend_memory[self.cursor_index:batch_size+self.cursor_index])
+        labels = self.label_memory[self.cursor_index:batch_size+self.cursor_index]
+        labels = np.concatenate(labels, axis=0)
+        times = self.time_memory[self.cursor_index:batch_size+self.cursor_index]
         # クラスインデックスに変換 損失関数がCrossEntropyLossの場合
         # labels = np.argmax(labels, axis=1)
 
-        self.memory = self.memory[batch_size:]
+        # print("Cursor", self.cursor_index, "BatchSize", batch_size, "labels", labels.shape)
 
-        return classifier_x, box_x, trend_x, labels
+        self.cursor_index += batch_size
+        
+        return classifier_x, box_x, trend_x, labels, times
+    
+    def clear(self):    
+        """
+        メモリーに保存した経験を全て消去する
+        """
+        self.cursor_index = 0
+        self.classifier_memory = []
+        self.box_memory = []
+        self.trend_memory = []
+        self.label_memory = []
+        self.time_memory = []
 
+    def clear_cursor(self):
+        """
+        カーソルを初期化する
+        """
+        self.cursor_index = 0
 
-    def __len__(self):
-        return len(self.memory)
+    def is_gettable(self, batch_size):
+        """
+        メモリからバッチサイズ分の経験を取り出せるか判定する
+        """
+        return self.cursor_index + batch_size < len(self.label_memory)
+    
+    def get_memory_gbytes(self):
+        """
+        メモリの使用量を取得する (GB)
+        """
+        if len(self.label_memory) == 0:
+            return 0
+        classifier_bytes = self.classifier_memory[0].nbytes * len(self.classifier_memory)
+        box_bytes = self.box_memory[0].nbytes * len(self.box_memory)
+        trend_bytes = self.trend_memory[0].nbytes * len(self.trend_memory)
+        label_bytes = self.label_memory[0].nbytes * len(self.label_memory)
+        bytes = classifier_bytes + box_bytes + trend_bytes + label_bytes
+        return bytes / 1024 / 1024 / 1024
+    
+    def get_memory(self):
+        """
+        メモリをnumpy配列に変換して返す
+        """
+        self.classifier_memory = np.array(self.classifier_memory)
+        self.box_memory = np.array(self.box_memory)
+        self.trend_memory = np.array(self.trend_memory)
+        self.label_memory = np.array(self.label_memory)
+        self.time_memory = np.array(self.time_memory)
+        output_dic = {"classifier": self.classifier_memory, "box": self.box_memory, "trend": self.trend_memory, "label": self.label_memory, "time": self.time_memory}
+        return output_dic
+    
+    def set_memory(self, memory_dic):
+        """
+        numpy配列をメモリにセットする
+        """
+        self.cursor_index = 0
+        self.classifier_memory = memory_dic["classifier"]
+        self.box_memory = memory_dic["box"]
+        self.trend_memory = memory_dic["trend"]
+        self.label_memory = memory_dic["label"]
+        self.time_memory = memory_dic["time"]
+
     
 # DQNエージェントの定義
 class RunTimeAgent:
@@ -47,7 +130,7 @@ class RunTimeAgent:
         trend_input_dim,
         label_sequence_length,
         batch_size=2048,
-        learning_rate=0.001,
+        learning_rate=0.01,
         
     ):
         self.memory = PrioritizedReplayBuffer()
@@ -55,6 +138,7 @@ class RunTimeAgent:
         self.model= HybridModel(classifier_input_dim, box_input_dim, trend_input_dim).to("cuda")
         # Adamオプティマイザを使用してネットワークのパラメータを最適化
         self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
+        self.scheduler = StepLR(self.optimizer, step_size=2, gamma=0.5)
         # modelのhidden_stateを保持するための変数
         self.batch_size = batch_size
         self.label_sequence_length = label_sequence_length
@@ -67,8 +151,8 @@ class RunTimeAgent:
         self.trend_hidden_state = None
 
     # 経験をメモリに追加
-    def remember(self, classifier_x, box_x, trend_x, label):
-        self.memory.add(classifier_x, box_x, trend_x, label)
+    def remember(self, classifier_x, box_x, trend_x, label, time):
+        self.memory.add(classifier_x, box_x, trend_x, label, time)
 
     # 行動を選択
     def action(self, classifier_x, box_x, trend_x) -> np.ndarray:
@@ -111,11 +195,11 @@ class RunTimeAgent:
     # 経験をリプレイしてネットワークを訓練
     def replay(self, train:bool) -> float:
         self.frame += 1
-        if len(self.memory) < self.batch_size + self.label_sequence_length:
-            return None # メモリが十分に溜まるまではリプレイを実行しない
+        if not self.memory.is_gettable(self.batch_size + self.label_sequence_length):
+            return None, None # メモリが十分に溜まるまではリプレイを実行しない
         
         # メモリから優先度に基づいたサンプリングを実行
-        classifier_x, box_x, trend_x, labels = self.memory.pop(self.batch_size)
+        classifier_x, box_x, trend_x, labels, times = self.memory.get(self.batch_size)
         classifier_x = torch.from_numpy(np.array(classifier_x)).float().to(self.device)
         box_x = torch.from_numpy(np.array(box_x)).float().to(self.device)
         trend_x = torch.from_numpy(np.array(trend_x)).float().to(self.device)
@@ -148,7 +232,7 @@ class RunTimeAgent:
             self.__hold_hidden_state(classifier_hc, box_hc, trend_hc)
             loss = self.calculate_loss(logit, labels)
 
-        return loss.item()
+        return loss.item(), times
     
     def __hold_hidden_state(self, classifier_hc, box_hc, trend_hc):
         """
@@ -172,13 +256,26 @@ class RunTimeAgent:
         self.trend_hidden_state = None
 
     def clear_memory(self):
-        self.memory = PrioritizedReplayBuffer()
+        self.memory.clear()
 
     def save_model(self, path):
         torch.save(self.model.state_dict(), path)
 
     def load_model(self, path):
         self.model.load_state_dict(torch.load(path, weights_only=True))
+
+    def step_scheduler(self):
+        """
+        learning_rateを可変するスケジューラーを1ステップ進める   
+        """
+        self.scheduler.step()
+
+    def get_learning_rate(self) -> float:
+        """
+        スケジューラーによって設定された学習率を取得するメソッド   
+        return: 学習率 float
+        """
+        return self.optimizer.param_groups[0]["lr"]
 
 if __name__ == "__main__":
 
