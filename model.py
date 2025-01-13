@@ -11,7 +11,8 @@ import torch.optim as optim
 class MarketClassifier(nn.Module):
     def __init__(self, input_dim, hidden_dim=32, output_dim=2):
         super(MarketClassifier, self).__init__()
-        self.lstm = nn.LSTM(input_dim, hidden_dim, batch_first=True)
+        self.conv1 = nn.Conv1d(input_dim, 32, kernel_size=5, stride=1)
+        self.lstm = nn.LSTM(32, hidden_dim, batch_first=True)
         self.fc = nn.Linear(hidden_dim, output_dim)
 
     def forward(self, x, hidden_state=None):
@@ -19,6 +20,14 @@ class MarketClassifier(nn.Module):
         x: [[[Upper_band, Lower_band, price_position, band_width], ...], ...] shape=(batch_size, sequence_length, input_dim)   
         price_position: (close - Lower_band) / (Upper_band - Lower_band) 現在の価格がボリンジャーバンドのどの位置にあるか
         """
+        # x.shape = (batch, seq_len, input_size)
+        # CNNの入力用に [batch, input_size, seq_len] に変換
+        x = x.permute(0, 2, 1)
+        x = self.conv1(x)
+        x = torch.relu(x)
+        # LSTMの入力用に [batch, seq_len(Conv1dで小さくなった長さ), conv1.out_channels] に変換
+        x = x.permute(0, 2, 1)
+
         batch_size = x.size(0)
         num_directions = 2 if self.lstm.bidirectional else 1
         if hidden_state is not None:
@@ -39,7 +48,8 @@ class MarketClassifier(nn.Module):
 class BoxMarketAnalyzer(nn.Module):
     def __init__(self, input_dim, output_dim=3, hidden_dim=128, num_layers=2):
         super(BoxMarketAnalyzer, self).__init__()
-        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers)
+        self.conv1 = nn.Conv1d(input_dim, 32, kernel_size=5, stride=1)
+        self.lstm = nn.LSTM(32, hidden_dim, num_layers)
         self.fc = nn.Linear(hidden_dim, output_dim)
     
     def forward(self, x, hidden_state=None):
@@ -47,6 +57,14 @@ class BoxMarketAnalyzer(nn.Module):
         x: (batch_size, sequence_length, input_dim)  
         return ボックス相場の上昇・下降確率
         """
+        # x.shape = (batch, seq_len, input_size)
+        # CNNの入力用に [batch, input_size, seq_len] に変換
+        x = x.permute(0, 2, 1)
+        x = self.conv1(x)
+        x = torch.relu(x)
+        # LSTMの入力用に [batch, seq_len(Conv1dで小さくなった長さ), conv1.out_channels] に変換
+        x = x.permute(0, 2, 1)
+
         batch_size = x.size(0)
         num_directions = 2 if self.lstm.bidirectional else 1
         if hidden_state is not None:
@@ -67,7 +85,8 @@ class BoxMarketAnalyzer(nn.Module):
 class TrendMarketAnalyzer(nn.Module):
     def __init__(self, input_dim, output_dim=3, hidden_dim=128, num_layers=2):
         super(TrendMarketAnalyzer, self).__init__()
-        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers)
+        self.conv1 = nn.Conv1d(input_dim, 32, kernel_size=5, stride=1)
+        self.lstm = nn.LSTM(32, hidden_dim, num_layers)
         self.fc = nn.Linear(hidden_dim, output_dim)
     
     def forward(self, x, hidden_state=None):
@@ -75,6 +94,14 @@ class TrendMarketAnalyzer(nn.Module):
         x: (batch_size, sequence_length, input_dim)   
         return トレンド方向の上昇・下降確率
         """
+        # x.shape = (batch, seq_len, input_size)
+        # CNNの入力用に [batch, input_size, seq_len] に変換
+        x = x.permute(0, 2, 1)
+        x = self.conv1(x)
+        x = torch.relu(x)
+        # LSTMの入力用に [batch, seq_len(Conv1dで小さくなった長さ), conv1.out_channels] に変換
+        x = x.permute(0, 2, 1)
+        
         batch_size = x.size(0)
         num_directions = 2 if self.lstm.bidirectional else 1
         if hidden_state is not None:

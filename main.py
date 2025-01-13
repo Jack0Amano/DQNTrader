@@ -548,24 +548,24 @@ if __name__ == "__main__":
 
     print("Start learning:", datetime.datetime.now())
 
-    epoch = 128
+    epoch = 80
     
     train_loss_history = []
     test_loss_history = []
 
     # agent_model.load_model("models/agent_model.pth")
 
-    model_name = "agent_model_Schedule_3"
+    model_name = "cnn_lstm"
 
     train_data = None
     test_data = None
 
     is_cash_data_exist = False
     # キャッシュがある場合はそれを使用する
-    if os.path.exists(f"cash/{model_name}_train_data.npy"):
-        train_data = np.load(f"cash/{model_name}_train_data.npy", allow_pickle=True).item()
-    if os.path.exists(f"cash/{model_name}_test_data.npy"):
-        test_data = np.load(f"cash/{model_name}_test_data.npy", allow_pickle=True).item()
+    if os.path.exists(f"cash/train_data.npy"):
+        train_data = np.load(f"cash/train_data.npy", allow_pickle=True).item()
+    if os.path.exists(f"cash/test_data.npy"):
+        test_data = np.load(f"cash/test_data.npy", allow_pickle=True).item()
         print("Load cash data")
         is_cash_data_exist = True
 
@@ -632,10 +632,10 @@ if __name__ == "__main__":
         agent_model.step_scheduler(test_loss_mean)
         agent_model.save_model(f"models/{model_name}_{e}.pth")
 
-    if is_cash_data_exist:
+    if not is_cash_data_exist:
         # 解析データをキャッシュとして保存
-        os.remove(f"cash/{model_name}_train_data.npy")
-        os.remove(f"cash/{model_name}_test_data.npy")
+        np.save("cash/train_data.npy", train_data)
+        np.save("cash/test_data.npy", test_data)
     
     notify_sound()
     print("\nEnd learning:", datetime.datetime.now())
@@ -650,7 +650,7 @@ if __name__ == "__main__":
     ax.plot(test_loss_history, label="Test Loss")
 
     ax.legend()
-    plt.savefig("models/loss2.png")
+    plt.savefig("models/cnn_lstm.png")
     plt.show()
 
     
