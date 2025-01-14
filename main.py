@@ -548,14 +548,17 @@ if __name__ == "__main__":
 
     print("Start learning:", datetime.datetime.now())
 
-    epoch = 80
+    epoch = 50
     
+    train_accuracy_history = []
+    test_accuracy_history = []
     train_loss_history = []
     test_loss_history = []
 
+
     # agent_model.load_model("models/agent_model.pth")
 
-    model_name = "cnn_lstm"
+    model_name = "cnn-64_lstm-128"
 
     train_data = None
     test_data = None
@@ -572,6 +575,7 @@ if __name__ == "__main__":
     for e in range(epoch):
         # trainデータでの学習を行う
         train_loss = []
+        train_accuracy = []
         # 既に解析済みの入力データとラベルがある場合はそれを使用する
         if train_data is not None:
             agent_model.memory.set_memory(train_data)
@@ -585,23 +589,27 @@ if __name__ == "__main__":
                 label = train_trader.get_label(train_df, now, window=label_sequence_length)
                 agent_model.remember(classifier_x, box_x, trend_x, label, now)
 
-            training_loss, train_times = agent_model.replay(True)
+            training_loss, train_times, accuracy = agent_model.replay(True)
 
             if training_loss is not None:
                 train_loss.append(training_loss)
+                train_accuracy.append(accuracy)
                 remove_cmd_line()
                 print(train_times[-1], end="", flush=True)
         
         train_data = agent_model.memory.get_memory()
         agent_model.clear_memory()
         agent_model.clear_hidden_state()
-        train_loss_mean = np.mean(train_loss)
+        train_loss_mean = np.mean(train_loss).round(5)
+        train_accuracy_mean = np.mean(train_accuracy).round(6)
         train_loss_history.append(train_loss_mean)
+        train_accuracy_history.append(train_accuracy_mean)
 
         print("\n", end="", flush=True)
 
         # testデータでの評価を行う
         test_loss = []
+        test_accuracy = []
         # 既に解析済みの入力データとラベルがある場合はそれを使用する
         if test_data is not None:
             agent_model.memory.set_memory(test_data)
@@ -614,21 +622,26 @@ if __name__ == "__main__":
                 label = test_trader.get_label(test_df, now, window=label_sequence_length)
                 agent_model.remember(classifier_x, box_x, trend_x, label, now)
             
-            test_run_loss, test_times = agent_model.replay(False)
+            test_run_loss, test_times, accuracy = agent_model.replay(False)
 
             if test_run_loss is not None:
                 test_loss.append(test_run_loss)
+                test_accuracy.append(accuracy)
                 remove_cmd_line()
                 print(test_times[-1], end="", flush=True)
 
         test_data = agent_model.memory.get_memory()
         agent_model.clear_memory()
         agent_model.clear_hidden_state()
-        test_loss_mean = np.mean(test_loss)
+        test_loss_mean = np.mean(test_loss).round(5)
+        test_accuracy_mean = np.mean(test_accuracy).round(6)
         test_loss_history.append(test_loss_mean)
+        test_accuracy_history.append(test_accuracy_mean)
 
         lr = agent_model.get_learning_rate()
-        print("\nEpoch:", e, "Train loss:", train_loss_mean, "Test loss:", test_loss_mean, "Learning rate:", lr)
+        train_text = f"Train [loss: {train_loss_mean}, accuracy: {train_accuracy_mean}]"
+        test_text = f"Test [loss: {test_loss_mean}, accuracy: {test_accuracy_mean}]"
+        print("\nEpoch:", e, train_text, test_text, "lr:", lr)
         agent_model.step_scheduler(test_loss_mean)
         agent_model.save_model(f"models/{model_name}_{e}.pth")
 
@@ -641,16 +654,22 @@ if __name__ == "__main__":
     print("\nEnd learning:", datetime.datetime.now())
 
     # draw graph
-    train_loss_history = np.array(train_loss_history)
-    test_loss_history = np.array(test_loss_history)
+    train_accuracy_history = np.array(train_accuracy_history)
+    test_accuracy_history = np.array(test_accuracy_history)
 
     fig, ax = plt.subplots()
     fig.autofmt_xdate()
-    ax.plot(train_loss_history, label="Train Loss")
-    ax.plot(test_loss_history, label="Test Loss")
+    ax.plot(train_accuracy_history, label="Train accuracy")
+    ax.plot(test_accuracy_history, label="Test accuracy")
+
+    # 最も低い値にラインを引く
+    min_index = np.argmin(test_accuracy_history)
+    min_value = test_accuracy_history[min_index]
+    ax.axvline(min_index, color='gray', linestyle='--', label=f"Min accuracy: {min_index}", alpha=0.5)
+    ax.axhline(min_value, color='gray', linestyle='--', label=f"Min accuracy: {min_value}", alpha=0.5)
 
     ax.legend()
-    plt.savefig("models/cnn_lstm.png")
+    plt.savefig(f"models/{model_name}.png")
     plt.show()
 
     

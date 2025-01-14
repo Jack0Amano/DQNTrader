@@ -9,11 +9,23 @@ import torch.optim as optim
 # 相場分類器
 
 class MarketClassifier(nn.Module):
-    def __init__(self, input_dim, hidden_dim=32, output_dim=2):
+    def __init__(self, input_dim, hidden_dim=64, output_dim=2):
         super(MarketClassifier, self).__init__()
-        self.conv1 = nn.Conv1d(input_dim, 32, kernel_size=5, stride=1)
-        self.lstm = nn.LSTM(32, hidden_dim, batch_first=True)
+        self.conv1 = nn.Conv1d(input_dim, 64, kernel_size=4, stride=1)
+        self.dropout = nn.Dropout(0.5)
+        self.lstm = nn.LSTM(64, hidden_dim, batch_first=True)
         self.fc = nn.Linear(hidden_dim, output_dim)
+
+        # conv1dの初期化
+        nn.init.xavier_normal_(self.conv1.weight)
+        nn.init.constant_(self.conv1.bias, 0)
+
+        # lstmの初期化
+        for name, param in self.lstm.named_parameters():
+            if 'weight' in name:
+                nn.init.xavier_normal_(param)
+            else:
+                nn.init.constant_(param, 0)
 
     def forward(self, x, hidden_state=None):
         """
@@ -25,6 +37,7 @@ class MarketClassifier(nn.Module):
         x = x.permute(0, 2, 1)
         x = self.conv1(x)
         x = torch.relu(x)
+        x = self.dropout(x)
         # LSTMの入力用に [batch, seq_len(Conv1dで小さくなった長さ), conv1.out_channels] に変換
         x = x.permute(0, 2, 1)
 
@@ -48,9 +61,21 @@ class MarketClassifier(nn.Module):
 class BoxMarketAnalyzer(nn.Module):
     def __init__(self, input_dim, output_dim=3, hidden_dim=128, num_layers=2):
         super(BoxMarketAnalyzer, self).__init__()
-        self.conv1 = nn.Conv1d(input_dim, 32, kernel_size=5, stride=1)
-        self.lstm = nn.LSTM(32, hidden_dim, num_layers)
+        self.conv1 = nn.Conv1d(input_dim, 64, kernel_size=16, stride=1)
+        self.dropout = nn.Dropout(0.5)
+        self.lstm = nn.LSTM(64, hidden_dim, num_layers)
         self.fc = nn.Linear(hidden_dim, output_dim)
+
+        # conv1dの初期化
+        nn.init.xavier_normal_(self.conv1.weight)
+        nn.init.constant_(self.conv1.bias, 0)
+
+        # lstmの初期化
+        for name, param in self.lstm.named_parameters():
+            if 'weight' in name:
+                nn.init.xavier_normal_(param)
+            else:
+                nn.init.constant_(param, 0)
     
     def forward(self, x, hidden_state=None):
         """
@@ -62,6 +87,7 @@ class BoxMarketAnalyzer(nn.Module):
         x = x.permute(0, 2, 1)
         x = self.conv1(x)
         x = torch.relu(x)
+        x = self.dropout(x)
         # LSTMの入力用に [batch, seq_len(Conv1dで小さくなった長さ), conv1.out_channels] に変換
         x = x.permute(0, 2, 1)
 
@@ -85,9 +111,21 @@ class BoxMarketAnalyzer(nn.Module):
 class TrendMarketAnalyzer(nn.Module):
     def __init__(self, input_dim, output_dim=3, hidden_dim=128, num_layers=2):
         super(TrendMarketAnalyzer, self).__init__()
-        self.conv1 = nn.Conv1d(input_dim, 32, kernel_size=5, stride=1)
-        self.lstm = nn.LSTM(32, hidden_dim, num_layers)
+        self.conv1 = nn.Conv1d(input_dim, 64, kernel_size=8, stride=1)
+        self.dropout = nn.Dropout(0.5)
+        self.lstm = nn.LSTM(64, hidden_dim, num_layers)
         self.fc = nn.Linear(hidden_dim, output_dim)
+
+        # conv1dの初期化
+        nn.init.xavier_normal_(self.conv1.weight)
+        nn.init.constant_(self.conv1.bias, 0)
+
+        # lstmの初期化
+        for name, param in self.lstm.named_parameters():
+            if 'weight' in name:
+                nn.init.xavier_normal_(param)
+            else:
+                nn.init.constant_(param, 0)
     
     def forward(self, x, hidden_state=None):
         """
@@ -99,9 +137,10 @@ class TrendMarketAnalyzer(nn.Module):
         x = x.permute(0, 2, 1)
         x = self.conv1(x)
         x = torch.relu(x)
+        x = self.dropout(x)
         # LSTMの入力用に [batch, seq_len(Conv1dで小さくなった長さ), conv1.out_channels] に変換
         x = x.permute(0, 2, 1)
-        
+
         batch_size = x.size(0)
         num_directions = 2 if self.lstm.bidirectional else 1
         if hidden_state is not None:

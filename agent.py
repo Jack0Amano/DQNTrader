@@ -129,8 +129,8 @@ class RunTimeAgent:
         box_input_dim,
         trend_input_dim,
         label_sequence_length,
-        batch_size=2048,
-        learning_rate=0.005,
+        batch_size=1024,
+        learning_rate=0.001,
         
     ):
         self.memory = PrioritizedReplayBuffer()
@@ -138,7 +138,7 @@ class RunTimeAgent:
         self.model= HybridModel(classifier_input_dim, box_input_dim, trend_input_dim).to("cuda")
         # Adamオプティマイザを使用してネットワークのパラメータを最適化
         self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
-        self.scheduler = ReduceLROnPlateau(self.optimizer, mode="min", factor=0.5, patience=5, verbose=True)
+        self.scheduler = ReduceLROnPlateau(self.optimizer, mode="min", factor=0.5, patience=3, verbose=True)
         # modelのhidden_stateを保持するための変数
         self.batch_size = batch_size
         self.label_sequence_length = label_sequence_length
@@ -191,12 +191,27 @@ class RunTimeAgent:
         tensor_label = torch.from_numpy(label).to(self.device)
         return self.criterion(model_logit, tensor_label)
 
+    # 正答率を計算
+    def calculate_accuracy(self, model_logit: torch.Tensor, label: np.ndarray) -> float:
+        """
+        正答率の計算   
+        """
+        # 最も確率の高いクラスを予測クラスとする
+        model_logit = torch.sigmoid(model_logit)
+        model_out = model_logit.clone().detach().cpu().numpy()
+        model_max = np.max(model_out, axis=1).reshape(-1, 1)
+        model_out = model_out == model_max
+        model_out = np.argmax(model_out, axis=1)
+        # 正解indexで比較する
+        label = np.argmax(label, axis=1)
+        correct = np.sum(model_out == label)
+        return correct / len(label)
 
     # 経験をリプレイしてネットワークを訓練
     def replay(self, train:bool) -> float:
         self.frame += 1
         if not self.memory.is_gettable(self.batch_size + self.label_sequence_length):
-            return None, None # メモリが十分に溜まるまではリプレイを実行しない
+            return None, None, None # メモリが十分に溜まるまではリプレイを実行しない
         
         # メモリから優先度に基づいたサンプリングを実行
         classifier_x, box_x, trend_x, labels, times = self.memory.get(self.batch_size)
@@ -219,6 +234,7 @@ class RunTimeAgent:
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
             self.optimizer.step()
+            accuracy = self.calculate_accuracy(logit, labels)
         else:
             # ネットワークを評価モードに切り替え
             self.model.eval()
@@ -232,7 +248,9 @@ class RunTimeAgent:
             self.__hold_hidden_state(classifier_hc, box_hc, trend_hc)
             loss = self.calculate_loss(logit, labels)
 
-        return loss.item(), times
+            accuracy = self.calculate_accuracy(logit, labels)
+
+        return loss.item(), times, accuracy
     
     def __hold_hidden_state(self, classifier_hc, box_hc, trend_hc):
         """
